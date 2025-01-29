@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use guidance::guidance_server::{Guidance, GuidanceServer};
 use guidance::{ControlInput, Missile, MissileHardwareConfig, MissileState};
 use tonic::{transport::Server, Request, Response, Status};
@@ -16,8 +18,12 @@ impl Guidance for MyGuidance {
         missile: Request<Missile>,
     ) -> Result<Response<MissileHardwareConfig>, Status> {
         println!("registered a missile: {:?}", missile);
+        tokio::time::sleep(Duration::from_millis(5)).await;
 
-        let missile_hardware_config = MissileHardwareConfig {};
+        let missile_hardware_config = MissileHardwareConfig {
+            player_name_regex: "".to_string(),
+            target_entity_regex: "".to_string(),
+        };
         Ok(Response::new(missile_hardware_config))
     }
 
@@ -26,6 +32,7 @@ impl Guidance for MyGuidance {
         missile_state: Request<MissileState>,
     ) -> Result<Response<ControlInput>, Status> {
         println!("get guidance for: {:?}", missile_state);
+        tokio::time::sleep(Duration::from_millis(5)).await;
 
         let control_input = ControlInput {
             pitch_turn: 0.0,
