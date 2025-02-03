@@ -1,7 +1,9 @@
+use std::pin::Pin;
 use std::time::Duration;
 
 use guidance::guidance_server::{Guidance, GuidanceServer};
 use guidance::{ControlInput, Missile, MissileHardwareConfig, MissileState};
+use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
 use tonic::{transport::Server, Request, Response, Status};
 
 pub mod guidance {
@@ -13,34 +15,37 @@ pub struct MyGuidance {}
 
 #[tonic::async_trait]
 impl Guidance for MyGuidance {
-    async fn register_missile(
-        &self,
-        missile: Request<Missile>,
-    ) -> Result<Response<MissileHardwareConfig>, Status> {
-        println!("registered a missile: {:?}", missile);
-        tokio::time::sleep(Duration::from_millis(5)).await;
-
-        let missile_hardware_config = MissileHardwareConfig {
-            player_name_regex: "".to_string(),
-            target_entity_regex: "".to_string(),
-        };
-        Ok(Response::new(missile_hardware_config))
-    }
-
+    type GetGuidanceStream =
+        Pin<Box<dyn Stream<Item = Result<ControlInput, Status>> + Send + 'static>>;
     async fn get_guidance(
         &self,
-        missile_state: Request<MissileState>,
-    ) -> Result<Response<ControlInput>, Status> {
-        println!("get guidance for: {:?}", missile_state);
-        tokio::time::sleep(Duration::from_millis(5)).await;
+        request: Request<tonic::Streaming<MissileState>>,
+    ) -> Result<Response<Self::GetGuidanceStream>, Status> {
+        println!("get_guidance");
 
-        let control_input = ControlInput {
-            pitch_turn: 0.0,
-            yaw_turn: 0.0,
-            explode: false,
-            disarm: false,
+        let mut stream = request.into_inner();
+
+        let output = async_stream::try_stream! {
+            while let Some(missile_state) = stream.next().await {
+                let missile_state = missile_state?;
+                println!("{:?}", missile_state);
+                let missile_hardware_config = MissileHardwareConfig {
+                    player_name_regex: "".to_string(),
+                    target_entity_regex: "".to_string(),
+                };
+                yield ControlInput {
+                    // TODO: id handling
+                    id: 69,
+                    hardware_config :None ,
+                    pitch_turn: 0.0,
+                    yaw_turn: 0.0,
+                    explode: false,
+                    disarm: false,
+                };
+            }
+            println!("finished connection");
         };
-        Ok(Response::new(control_input))
+        Ok(Response::new(Box::pin(output) as Self::GetGuidanceStream))
     }
 }
 
