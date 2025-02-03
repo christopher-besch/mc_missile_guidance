@@ -26,6 +26,7 @@ impl Guidance for MyGuidance {
         let mut stream = request.into_inner();
 
         let output = async_stream::try_stream! {
+            let mut id = 0;
             while let Some(missile_state) = stream.next().await {
                 let missile_state = missile_state?;
                 println!("{:?}", missile_state);
@@ -33,9 +34,12 @@ impl Guidance for MyGuidance {
                     player_name_regex: "".to_string(),
                     target_entity_regex: "".to_string(),
                 };
+                println!("sending {:?}: {:?}", id, missile_state);
+                id += 1;
+                // tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 yield ControlInput {
                     // TODO: id handling
-                    id: 69,
+                    id: id,
                     hardware_config :None ,
                     pitch_turn: 0.0,
                     yaw_turn: 0.0,
