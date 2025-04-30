@@ -16,6 +16,43 @@ pub mod guidance {
 #[derive(Debug, Default)]
 pub struct MyGuidance {}
 
+pub trait MissileGuidance {
+    // The id of the ControlInput will be set by the caller.
+    fn get_guidance(
+        &self,
+        missile_state: MissileState,
+    ) -> impl std::future::Future<Output = ControlInput>;
+}
+
+#[derive(Debug, Default)]
+pub struct StraightMissileGuidance {}
+
+impl MissileGuidance for StraightMissileGuidance {
+    async fn get_guidance(&self, missile_state: MissileState) -> ControlInput {
+        println!("{:?}", missile_state);
+        let missile_hardware_config = MissileHardwareConfig {
+            warhead: WarHead::TntM as i32,
+            player_name_regex: "".to_string(),
+            target_entity_regex: "".to_string(),
+            airframe: Airframe::DefaultAirframe as i32,
+            motor: Motor::SingleStageM as i32,
+            battery: Battery::LiIonM as i32,
+            seeker: Seeker::NoSeeker as i32,
+            inertial_system: InertialSystem::DefaultImu as i32,
+        };
+
+        return ControlInput {
+            // The id of the ControlInput will be set by the caller.
+            id: 0,
+            hardware_config: Some(missile_hardware_config),
+            pitch_turn: 0.0,
+            yaw_turn: 0.0,
+            explode: false,
+            disarm: missile_state.time > 10,
+        };
+    }
+}
+
 #[tonic::async_trait]
 impl Guidance for MyGuidance {
     type GetGuidanceStream =
@@ -29,23 +66,15 @@ impl Guidance for MyGuidance {
         let mut stream = request.into_inner();
 
         let output = async_stream::try_stream! {
-            let mut id = 0;
+            let mut id: i32 = 0;
+            let guidance = StraightMissileGuidance{};
             while let Some(missile_state) = stream.next().await {
                 let missile_state = missile_state?;
-                println!("{:?}", missile_state);
-                let missile_hardware_config = MissileHardwareConfig {warhead:WarHead::TntM as i32,player_name_regex:"".to_string(),target_entity_regex:"".to_string(), airframe: Airframe::DefaultAirframe as i32, motor: Motor::SingleStageM as i32, battery: Battery::LiIonM as i32, seeker: Seeker::NoSeeker as i32, inertial_system: InertialSystem::DefaultImu as i32};
-                println!("sending {:?}: {:?}", id, missile_state);
-                id += 1;
                 // tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                yield ControlInput {
-                    // TODO: id handling
-                    id: id,
-                    hardware_config :Some(missile_hardware_config    ),
-                    pitch_turn: 0.0,
-                    yaw_turn: 0.0,
-                    explode: false,
-                    disarm: false,
-                };
+                let mut control_input = guidance.get_guidance(missile_state).await;
+                id += 1;
+                control_input.id = id;
+                yield control_input;
             }
             println!("finished connection");
         };
