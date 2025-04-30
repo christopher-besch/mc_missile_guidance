@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use guidance::guidance_server::{Guidance, GuidanceServer};
 use guidance::missile_hardware_config::{
-    Airframe, Battery, InertialSystem, Motor, Seeker, WarHead,
+    Airframe, Battery, InertialSystem, Motor, Seeker, Warhead,
 };
 use guidance::{ControlInput, Missile, MissileHardwareConfig, MissileState};
 use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
@@ -19,19 +19,23 @@ pub struct MyGuidance {}
 pub trait MissileGuidance {
     // The id of the ControlInput will be set by the caller.
     fn get_guidance(
-        &self,
+        &mut self,
         missile_state: MissileState,
     ) -> impl std::future::Future<Output = ControlInput>;
 }
 
 #[derive(Debug, Default)]
-pub struct StraightMissileGuidance {}
+pub struct StraightMissileGuidance {
+    target_pitch: f64,
+    target_yaw: f64,
+    hardware_config: Option<MissileHardwareConfig>,
+}
 
-impl MissileGuidance for StraightMissileGuidance {
-    async fn get_guidance(&self, missile_state: MissileState) -> ControlInput {
-        println!("{:?}", missile_state);
-        let missile_hardware_config = MissileHardwareConfig {
-            warhead: WarHead::TntM as i32,
+impl StraightMissileGuidance {
+    async fn launch_missile(&mut self, missile_state: &MissileState) {
+        assert!(missile_state.time == 0);
+        self.hardware_config = Some(MissileHardwareConfig {
+            warhead: Warhead::TntM as i32,
             player_name_regex: "".to_string(),
             target_entity_regex: "".to_string(),
             airframe: Airframe::DefaultAirframe as i32,
@@ -39,17 +43,40 @@ impl MissileGuidance for StraightMissileGuidance {
             battery: Battery::LiIonM as i32,
             seeker: Seeker::NoSeeker as i32,
             inertial_system: InertialSystem::DefaultImu as i32,
-        };
+        });
+        self.target_pitch = missile_state.pitch;
+        self.target_yaw = missile_state.yaw;
 
-        return ControlInput {
+        println!(
+            "target_pitch: {:?} target_yaw: {:?}",
+            self.target_pitch, self.target_yaw
+        );
+    }
+}
+
+impl MissileGuidance for StraightMissileGuidance {
+    async fn get_guidance(&mut self, missile_state: MissileState) -> ControlInput {
+        // println!("{:?}", missile_state);
+        if missile_state.time == 0 {
+            self.launch_missile(&missile_state).await;
+        }
+
+        let mut control_input = ControlInput {
             // The id of the ControlInput will be set by the caller.
             id: 0,
-            hardware_config: Some(missile_hardware_config),
-            pitch_turn: 0.0,
-            yaw_turn: 0.0,
+            // the hardware_config will be set later if we're in the 0th tick.
+            hardware_config: None,
+            pitch_turn: self.target_pitch - missile_state.pitch,
+            yaw_turn: self.target_yaw - missile_state.yaw,
             explode: false,
-            disarm: missile_state.time > 10,
+            // disarm: missile_state.time > 10,
+            disarm: false,
         };
+        if missile_state.time == 0 {
+            assert!(self.hardware_config.is_some());
+            control_input.hardware_config = std::mem::replace(&mut self.hardware_config, None);
+        }
+        return control_input;
     }
 }
 
@@ -67,7 +94,11 @@ impl Guidance for MyGuidance {
 
         let output = async_stream::try_stream! {
             let mut id: i32 = 0;
-            let guidance = StraightMissileGuidance{};
+            let mut guidance = StraightMissileGuidance{
+                target_pitch: 0.0,
+                target_yaw: 0.0,
+                hardware_config: None,
+            };
             while let Some(missile_state) = stream.next().await {
                 let missile_state = missile_state?;
                 // tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
