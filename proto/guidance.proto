@@ -14,9 +14,6 @@ message Missile {
 }
 
 message MissileState {
-    int32 id = 1;
-    int32 lastControlInputId = 2;
-
     // may not change during flight
     Missile missile = 3;
 
@@ -51,20 +48,21 @@ message MissileState {
 }
 
 message MissileHardwareConfig {
-    // - sniper arrow without explosion
+    // - sniper arrow without explosion (the faster the more damage)
     // - tnt (different strengths)
     // - effect (different types)
     // - inert
     // - anti-elytra (or anti-air, with anti-rocket)
     // - block-piercing
-    enum WarHead {
+    enum Warhead {
         BLANK = 0;
         TNT_M = 1;
     }
-    WarHead warhead = 1;
+    Warhead warhead = 1;
 
     // - movement stability (noise in rotation)
     // - rotation control speed
+    // - flight ceiling?
     enum Airframe {
         DEFAULT_AIRFRAME = 0;
     }
@@ -118,6 +116,9 @@ message MissileHardwareConfig {
 }
 
 message ControlInput {
+    // The guidance server sends ControlInput structs with increasing id.
+    // The first ControlInput id is 1.
+    // This is used to detect when Controlinput structs arrive too late or out of order.
     int32 id = 1;
 
     // only to be sent in first message
