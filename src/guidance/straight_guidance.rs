@@ -42,9 +42,9 @@ impl MissileGuidance for StraightGuidance {
         };
         if missile_state.time == 0 {
             assert!(self.hardware_config.is_some());
-            control_input.hardware_config = std::mem::replace(&mut self.hardware_config, None);
+            control_input.hardware_config = self.hardware_config.take();
         }
-        return control_input;
+        control_input
     }
 }
 
