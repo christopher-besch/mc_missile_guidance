@@ -7,10 +7,7 @@ use url::Url;
 
 use anyhow::{Context, Result};
 
-use crate::{
-    guidance_grpc::{guidance_server::Guidance, ControlInput, MissileState},
-    MyGuidance,
-};
+use crate::guidance_grpc::{ControlInput, MissileState};
 
 pub trait MissileGuidance {
     fn new(params: HashMap<String, String>) -> impl std::future::Future<Output = Self>;

@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
-use crate::guidance_grpc::guidance_server::{Guidance, GuidanceServer};
 use crate::guidance_grpc::missile_hardware_config::{
     Airframe, Battery, InertialSystem, Motor, Seeker, Warhead,
 };
-use crate::guidance_grpc::{ControlInput, Missile, MissileHardwareConfig, MissileState};
+use crate::guidance_grpc::{ControlInput, MissileHardwareConfig, MissileState};
 
 use super::MissileGuidance;
 

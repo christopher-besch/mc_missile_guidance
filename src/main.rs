@@ -1,19 +1,15 @@
 mod guidance;
 
+#[allow(clippy::all)]
 pub mod guidance_grpc {
     tonic::include_proto!("mcmissile.guidance");
 }
 
 use std::pin::Pin;
-use std::time::Duration;
 
-use guidance::MissileGuidance;
 use guidance_grpc::guidance_server::{Guidance, GuidanceServer};
-use guidance_grpc::missile_hardware_config::{
-    Airframe, Battery, InertialSystem, Motor, Seeker, Warhead,
-};
-use guidance_grpc::{ControlInput, Missile, MissileHardwareConfig, MissileState};
-use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
+use guidance_grpc::{ControlInput, MissileState};
+use tokio_stream::Stream;
 use tonic::{transport::Server, Request, Response, Status};
 
 #[derive(Debug, Default)]
