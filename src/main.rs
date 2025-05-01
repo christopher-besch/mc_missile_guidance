@@ -25,6 +25,36 @@ pub trait MissileGuidance {
 }
 
 #[derive(Debug, Default)]
+pub struct StraightMissileGuidanceWOGravity {
+    target_pitch: f64,
+    target_yaw: f64,
+    hardware_config: Option<MissileHardwareConfig>,
+}
+
+impl StraightMissileGuidanceWOGravity {
+    async fn launch_missile(&mut self, missile_state: &MissileState) {
+        assert!(missile_state.time == 0);
+        self.hardware_config = Some(MissileHardwareConfig {
+            warhead: Warhead::TntM as i32,
+            player_name_regex: "".to_string(),
+            target_entity_regex: "".to_string(),
+            airframe: Airframe::DefaultAirframe as i32,
+            motor: Motor::SingleStageM as i32,
+            battery: Battery::LiIonM as i32,
+            seeker: Seeker::NoSeeker as i32,
+            inertial_system: InertialSystem::DefaultImu as i32,
+        });
+        self.target_pitch = missile_state.pitch;
+        self.target_yaw = missile_state.yaw;
+
+        println!(
+            "target_pitch: {:?} target_yaw: {:?}",
+            self.target_pitch, self.target_yaw
+        );
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct StraightMissileGuidance {
     target_pitch: f64,
     target_yaw: f64,
@@ -44,6 +74,7 @@ impl StraightMissileGuidance {
             seeker: Seeker::NoSeeker as i32,
             inertial_system: InertialSystem::DefaultImu as i32,
         });
+        // TODO:
         self.target_pitch = missile_state.pitch;
         self.target_yaw = missile_state.yaw;
 
