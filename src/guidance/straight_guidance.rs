@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::guidance_grpc::guidance_server::{Guidance, GuidanceServer};
 use crate::guidance_grpc::missile_hardware_config::{
     Airframe, Battery, InertialSystem, Motor, Seeker, Warhead,
@@ -7,14 +9,21 @@ use crate::guidance_grpc::{ControlInput, Missile, MissileHardwareConfig, Missile
 use super::MissileGuidance;
 
 #[derive(Debug, Default)]
-pub struct StraightMissileGuidance {
-    // TODO: remove pub
-    pub target_pitch: f64,
-    pub target_yaw: f64,
-    pub hardware_config: Option<MissileHardwareConfig>,
+pub struct StraightGuidance {
+    target_pitch: f64,
+    target_yaw: f64,
+    hardware_config: Option<MissileHardwareConfig>,
 }
 
-impl MissileGuidance for StraightMissileGuidance {
+impl MissileGuidance for StraightGuidance {
+    async fn new(_params: HashMap<String, String>) -> Self {
+        Self {
+            target_pitch: 0.0,
+            target_yaw: 0.0,
+            hardware_config: None,
+        }
+    }
+
     async fn get_guidance(&mut self, missile_state: MissileState) -> ControlInput {
         println!("{:?}", missile_state);
         if missile_state.time == 0 {
@@ -40,7 +49,7 @@ impl MissileGuidance for StraightMissileGuidance {
     }
 }
 
-impl StraightMissileGuidance {
+impl StraightGuidance {
     async fn launch_missile(&mut self, missile_state: &MissileState) {
         assert!(missile_state.time == 0);
         self.hardware_config = Some(MissileHardwareConfig {

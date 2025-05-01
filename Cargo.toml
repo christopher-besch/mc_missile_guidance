@@ -4,11 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.98"
 async-stream = "0.3.6"
 prost = "0.13.4"
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1.17"
 tonic = "0.12.3"
+url = "2.5.4"
 
 [build-dependencies]
 tonic-build = "0.12.3"
