@@ -1,4 +1,5 @@
 mod guidance;
+pub mod lookup_tables;
 
 #[allow(clippy::all)]
 pub mod guidance_grpc {

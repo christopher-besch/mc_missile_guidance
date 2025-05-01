@@ -4,6 +4,7 @@ use crate::guidance_grpc::missile_hardware_config::{
     Airframe, Battery, InertialSystem, Motor, Seeker, Warhead,
 };
 use crate::guidance_grpc::{ControlInput, MissileHardwareConfig, MissileState};
+use crate::lookup_tables::lookup_gravity_heading;
 
 use super::MissileGuidance;
 
@@ -29,12 +30,16 @@ impl MissileGuidance for StraightGuidance {
             self.launch_missile(&missile_state).await;
         }
 
+        let gravity = 0.2;
+        let thrust = 0.4;
+
         let mut control_input = ControlInput {
             // The id of the ControlInput will be set by the caller.
             id: 0,
             // the hardware_config will be set later if we're in the 0th tick.
             hardware_config: None,
-            pitch_turn: self.target_pitch - missile_state.pitch,
+            pitch_turn: lookup_gravity_heading(gravity, self.target_pitch, thrust)
+                - missile_state.pitch,
             yaw_turn: self.target_yaw - missile_state.yaw,
             explode: false,
             // disarm: missile_state.time > 10,
@@ -61,7 +66,6 @@ impl StraightGuidance {
             seeker: Seeker::NoSeeker as i32,
             inertial_system: InertialSystem::DefaultImu as i32,
         });
-        // TODO:
         self.target_pitch = missile_state.pitch;
         self.target_yaw = missile_state.yaw;
 
