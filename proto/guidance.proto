@@ -118,9 +118,6 @@ message MissileHardwareConfig {
         DEFAULT_IMU = 0;
     }
     InertialSystem inertialSystem = 6;
-    
-    string targetEntityRegex = 7;
-    string playerNameRegex = 8;
 }
 
 message ControlInput {
@@ -140,6 +137,13 @@ message ControlInput {
     bool disarm = 6;
 }
 
+message HealthRequest {
+}
+
+message HealthResponse {
+}
+
 service Guidance {
-    rpc GetGuidance(stream MissileState) returns (stream ControlInput) {}
+    rpc GetGuidance(stream MissileState) returns (stream ControlInput);
+    rpc HealthCheck(HealthRequest) returns (HealthResponse);
 }

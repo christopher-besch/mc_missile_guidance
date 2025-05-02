@@ -9,7 +9,7 @@ pub mod guidance_grpc {
 use std::pin::Pin;
 
 use guidance_grpc::guidance_server::{Guidance, GuidanceServer};
-use guidance_grpc::{ControlInput, MissileState};
+use guidance_grpc::{ControlInput, HealthRequest, HealthResponse, MissileState};
 use tokio_stream::Stream;
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -29,6 +29,12 @@ impl Guidance for MyGuidance {
         Ok(Response::new(
             Box::pin(guidance_stream) as Self::GetGuidanceStream
         ))
+    }
+    async fn health_check(
+        &self,
+        _request: tonic::Request<HealthRequest>,
+    ) -> std::result::Result<tonic::Response<HealthResponse>, tonic::Status> {
+        Ok(Response::new(HealthResponse {}))
     }
 }
 
