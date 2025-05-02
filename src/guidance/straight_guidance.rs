@@ -48,6 +48,10 @@ impl MissileGuidance for StraightGuidance {
         if missile_state.time == 0 {
             assert!(self.hardware_config.is_some());
             control_input.hardware_config = self.hardware_config.take();
+            println!(
+                "setting hardware to {:?}",
+                control_input.hardware_config.clone().unwrap().seeker,
+            );
         }
         control_input
     }
@@ -63,7 +67,8 @@ impl StraightGuidance {
             airframe: Airframe::DefaultAirframe as i32,
             motor: Motor::SingleStageM as i32,
             battery: Battery::LiIonM as i32,
-            seeker: Seeker::NoSeeker as i32,
+            seeker: Seeker::IrSeekerM as i32,
+            seeker_entity_name: "".to_string(),
             inertial_system: InertialSystem::DefaultImu as i32,
         });
         self.target_pitch = missile_state.pitch;

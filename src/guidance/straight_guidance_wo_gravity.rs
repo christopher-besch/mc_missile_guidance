@@ -59,7 +59,8 @@ impl StraightGuidanceWOGravity {
             airframe: Airframe::DefaultAirframe as i32,
             motor: Motor::SingleStageM as i32,
             battery: Battery::LiIonM as i32,
-            seeker: Seeker::NoSeeker as i32,
+            seeker: Seeker::IrSeekerM as i32,
+            seeker_entity_name: "".to_string(),
             inertial_system: InertialSystem::DefaultImu as i32,
         });
         self.target_pitch = missile_state.pitch;
