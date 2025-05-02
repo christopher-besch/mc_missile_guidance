@@ -6,6 +6,7 @@ use crate::guidance_grpc::missile_hardware_config::{
 use crate::guidance_grpc::{ControlInput, MissileHardwareConfig, MissileState};
 use crate::lookup_tables::lookup_gravity_heading;
 use anyhow::{Context, Result};
+use approx::{assert_relative_eq, relative_eq};
 
 use na::Vector3;
 use nalgebra as na;
@@ -118,8 +119,13 @@ impl TargetCoordGuidance {
         cur_target: na::Vector3<f64>,
     ) -> ControlInput {
         let to_cur_target = cur_target - Self::get_missile_pos(&missile_state);
-        // TODO: account for velocity
-        let (target_pitch, target_yaw) = Self::calc_pitch_yaw(to_cur_target);
+        // This is not entirely correct as we loose a bit of our thrust due to gravity.
+        let acc_to_cur_target = Self::calculate_acc_for_target_vel(
+            Self::get_missile_vel(&missile_state),
+            to_cur_target,
+            THRUST,
+        );
+        let (target_pitch, target_yaw) = Self::calc_pitch_yaw(acc_to_cur_target);
         let pitch_turn =
             lookup_gravity_heading(GRAVITY, target_pitch, THRUST) - missile_state.pitch;
         let yaw_turn = target_yaw - missile_state.yaw;
@@ -143,13 +149,57 @@ impl TargetCoordGuidance {
         )
     }
 
+    fn get_missile_vel(missile_state: &MissileState) -> na::Vector3<f64> {
+        Vector3::new(
+            missile_state.vel_x,
+            missile_state.vel_y,
+            missile_state.vel_z,
+        )
+    }
+
+    // The length of target_vel doesn't matter.
+    // The length of the returned acc is not guaranteed to be anything.
+    fn calculate_acc_for_target_vel(
+        cur_vel: na::Vector3<f64>,
+        target_vel: na::Vector3<f64>,
+        thrust: f64,
+    ) -> na::Vector3<f64> {
+        // When the missile doesn't move, just head for the target.
+        if relative_eq!(cur_vel.norm_squared(), 0.0) {
+            return target_vel;
+        }
+
+        println!("{}", cur_vel);
+        println!("{}", target_vel);
+        println!("{}", thrust);
+        let radical = 4.0 * target_vel.dot(&cur_vel).powf(2.0)
+            - 4.0 * target_vel.norm_squared() * (cur_vel.norm_squared() - thrust.powf(2.0));
+        println!("{}", radical);
+
+        if radical <= 0.0 {
+            let p = cur_vel.dot(&target_vel) / target_vel.norm_squared() * target_vel;
+            let acc = p - cur_vel;
+            println!("proj {}", acc);
+            return acc;
+        } else {
+            let r1 = (2.0 * target_vel.dot(&cur_vel) + radical.sqrt())
+                / (2.0 * target_vel.norm_squared());
+            // fun fact: this would be good opportunity for breaking
+            // let r2 = (2.0 * target_vel.dot(&cur_vel) - radical.sqrt())
+            //     / (2.0 * target_vel.norm_squared());
+            let r = r1;
+            let acc = r * target_vel - cur_vel;
+            assert_relative_eq!(acc.norm(), thrust, epsilon = 0.0001);
+            println!("sphere {}", acc);
+            return acc;
+        }
+    }
+
     // Calculate the pitch and yaw of a vector as if it were the direction a player is looking in
     // degrees.
     fn calc_pitch_yaw(vec: na::Vector3<f64>) -> (f64, f64) {
-        println!("{:?}", vec);
         // projected onto the horizontal plane
         let vec_horizontal = na::Vector3::new(vec.x, 0.0, vec.z);
-        println!("{:?}", vec_horizontal);
         let mut pitch = vec_horizontal
             .normalize()
             .dot(&vec.normalize())
@@ -158,9 +208,7 @@ impl TargetCoordGuidance {
         if vec.y < 0.0 {
             pitch *= -1.0;
         }
-        println!("{:?}", pitch);
         let yaw = vec.x.atan2(vec.z).to_degrees();
-        println!("{:?}", yaw);
         (pitch, yaw)
     }
 
