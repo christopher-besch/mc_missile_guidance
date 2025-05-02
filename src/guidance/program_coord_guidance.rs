@@ -66,7 +66,7 @@ impl MissileGuidance for TargetCoordGuidance {
                 airframe: Airframe::DefaultAirframe as i32,
                 motor: Motor::SingleStageM as i32,
                 battery: Battery::LiIonM as i32,
-                seeker: Seeker::IrSeekerM as i32,
+                seeker: Seeker::NoSeeker as i32,
                 seeker_entity_name: "".to_string(),
                 inertial_system: InertialSystem::DefaultImu as i32,
             }),
@@ -143,6 +143,8 @@ impl TargetCoordGuidance {
         )
     }
 
+    // Calculate the pitch and yaw of a vector as if it were the direction a player is looking in
+    // degrees.
     fn calc_pitch_yaw(vec: na::Vector3<f64>) -> (f64, f64) {
         println!("{:?}", vec);
         // projected onto the horizontal plane
