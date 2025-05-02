@@ -5,10 +5,11 @@ use crate::guidance_grpc::missile_hardware_config::{
 };
 use crate::guidance_grpc::{ControlInput, MissileHardwareConfig, MissileState};
 use crate::lookup_tables::lookup_gravity_heading;
+use anyhow::Result;
 
 use super::MissileGuidance;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct StraightGuidance {
     target_pitch: f64,
     target_yaw: f64,
@@ -16,12 +17,15 @@ pub struct StraightGuidance {
 }
 
 impl MissileGuidance for StraightGuidance {
-    async fn new(_params: HashMap<String, String>) -> Self {
-        Self {
+    async fn new(
+        _params: HashMap<String, String>,
+        _initial_missile_state: &MissileState,
+    ) -> Result<Self> {
+        Ok(Self {
             target_pitch: 0.0,
             target_yaw: 0.0,
             hardware_config: None,
-        }
+        })
     }
 
     async fn get_guidance(&mut self, missile_state: MissileState) -> ControlInput {
