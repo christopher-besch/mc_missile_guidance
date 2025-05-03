@@ -19,7 +19,7 @@ static TOP_ATTACK_HEIGHT: f64 = 50.0;
 static TOP_ATTACK_TOWARDS_TARGET: f64 = 20.0;
 static PROXIMITY_FUSE_DIST: f64 = 5.0;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum State {
     Launch,
     RisingUp,
@@ -88,6 +88,7 @@ impl MissileGuidance for TargetCoordGuidance {
 
 impl TargetCoordGuidance {
     async fn launch(&mut self, missile_state: MissileState) -> ControlInput {
+        assert!(self.state == State::Launch);
         assert!(self.hardware_config.is_some());
         assert!(missile_state.time == 0);
 
@@ -100,6 +101,7 @@ impl TargetCoordGuidance {
     }
 
     async fn rising_up(&mut self, missile_state: MissileState) -> ControlInput {
+        assert!(self.state == State::RisingUp);
         if missile_state.pos_y >= self.top_attack_coord.y {
             self.state = State::FlyingTowardsTarget;
             return self.get_guidance(missile_state).await;
@@ -124,6 +126,7 @@ impl TargetCoordGuidance {
     }
 
     async fn flying_towards_target(&mut self, missile_state: MissileState) -> ControlInput {
+        assert!(self.state == State::FlyingTowardsTarget);
         // There is no next state; we simply detonate at some point.
         let (pitch_turn, yaw_turn) =
             calc_pitch_yaw_turn_for_stationary_target(&missile_state, self.target_coord, THRUST)

@@ -1,5 +1,6 @@
 use crate::{guidance_grpc::MissileState, lookup_tables::lookup_gravity_heading};
 
+use anyhow::{bail, Result};
 use approx::{assert_relative_eq, relative_eq};
 
 use nalgebra as na;
@@ -24,6 +25,34 @@ pub async fn get_missile_vel(missile_state: &MissileState) -> Vec3 {
     )
 }
 
+pub async fn get_seeker_target_pos(missile_state: &MissileState) -> Result<Option<Vec3>> {
+    if !missile_state.target_lock {
+        bail!("no target lock");
+    } else if !missile_state.target_visible {
+        Ok(None)
+    } else {
+        Ok(Some(Vec3::new(
+            missile_state.target_pos_x,
+            missile_state.target_pos_y,
+            missile_state.target_pos_z,
+        )))
+    }
+}
+
+pub async fn get_seeker_target_vel(missile_state: &MissileState) -> Result<Option<Vec3>> {
+    if !missile_state.target_lock {
+        bail!("no target lock");
+    } else if !missile_state.target_visible {
+        Ok(None)
+    } else {
+        Ok(Some(Vec3::new(
+            missile_state.target_vel_x,
+            missile_state.target_vel_y,
+            missile_state.target_vel_z,
+        )))
+    }
+}
+
 // The length of target_vel doesn't matter.
 // The length of the returned acc is not guaranteed to be anything.
 // This is not entirely correct as we loose a bit of our thrust due to gravity.
@@ -33,17 +62,12 @@ pub async fn calculate_acc_for_target_vel(cur_vel: Vec3, target_vel: Vec3, thrus
         return target_vel;
     }
 
-    println!("{}", cur_vel);
-    println!("{}", target_vel);
-    println!("{}", thrust);
     let radical = 4.0 * target_vel.dot(&cur_vel).powf(2.0)
         - 4.0 * target_vel.norm_squared() * (cur_vel.norm_squared() - thrust.powf(2.0));
-    println!("{}", radical);
 
     if radical <= 0.0 {
         let p = cur_vel.dot(&target_vel) / target_vel.norm_squared() * target_vel;
         let acc = p - cur_vel;
-        println!("proj {}", acc);
         acc
     } else {
         let r1 =
@@ -54,7 +78,6 @@ pub async fn calculate_acc_for_target_vel(cur_vel: Vec3, target_vel: Vec3, thrus
         let r = r1;
         let acc = r * target_vel - cur_vel;
         assert_relative_eq!(acc.norm(), thrust, epsilon = 0.0001);
-        println!("sphere {}", acc);
         acc
     }
 }

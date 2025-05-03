@@ -1,5 +1,6 @@
 pub mod helper;
 pub mod program_coord_guidance;
+pub mod stationary_entity_guidance;
 pub mod straight_guidance;
 pub mod straight_guidance_wo_gravity;
 
@@ -104,6 +105,21 @@ pub fn get_guidance_stream(
                                 yield control_input;
                             }
                         }
+                        ("/entity", params) => {
+                            // We know what guidance to use, hand the rest over.
+                            let mut guidance_stream = get_guidance_stream_after_launch(
+                                stationary_entity_guidance::StationaryEntityGuidance::new(
+                                    params,
+                                    &initial_missile_state,
+                                )
+                                .await,
+                                initial_missile_state,
+                                missile_state_stream,
+                            );
+                            while let Some(control_input) = guidance_stream.next().await {
+                                yield control_input;
+                            }
+                        }
                         (guidance_type, _) => {
                             eprintln!("unknown guidance type: {}", guidance_type);
                         }
@@ -143,6 +159,10 @@ fn get_guidance_stream_after_launch<G: MissileGuidance>(
                 while let Some(missile_state_res) = missile_state_stream.next().await {
                     match missile_state_res {
                         Ok(missile_state) => {
+                            if missile_state.destroyed {
+                                println!("received destroyed missile state, good bye");
+                                break;
+                            }
                             let mut control_input = guidance.get_guidance(missile_state).await;
                             id += 1;
                             control_input.id = id;
