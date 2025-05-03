@@ -4,16 +4,16 @@ use crate::guidance_grpc::missile_hardware_config::{
     Airframe, Battery, InertialSystem, Motor, Seeker, Warhead,
 };
 use crate::guidance_grpc::{ControlInput, MissileHardwareConfig, MissileState};
-use crate::lookup_tables::lookup_gravity_heading;
 use anyhow::{Context, Result};
-use approx::{assert_relative_eq, relative_eq};
 
-use na::Vector3;
 use nalgebra as na;
+type Vec3 = na::Vector3<f64>;
 
-use super::MissileGuidance;
+use crate::guidance::helper::{
+    calc_pitch_yaw_turn_for_stationary_target, get_missile_pos, sphere_should_detonate,
+};
+use crate::guidance::MissileGuidance;
 
-static GRAVITY: f64 = 0.2;
 static THRUST: f64 = 0.4;
 static TOP_ATTACK_HEIGHT: f64 = 50.0;
 static TOP_ATTACK_TOWARDS_TARGET: f64 = 20.0;
@@ -28,8 +28,8 @@ enum State {
 
 #[derive(Debug)]
 pub struct TargetCoordGuidance {
-    target_coord: Vector3<f64>,
-    top_attack_coord: Vector3<f64>,
+    target_coord: Vec3,
+    top_attack_coord: Vec3,
     top_attack: bool,
     state: State,
     hardware_config: Option<MissileHardwareConfig>,
@@ -42,16 +42,16 @@ impl MissileGuidance for TargetCoordGuidance {
     ) -> Result<Self> {
         assert!(init_missile_state.time == 0);
 
-        let pos = Self::get_missile_pos(init_missile_state);
-        let target_coords: Vector3<f64> = Vector3::new(
+        let pos = get_missile_pos(init_missile_state).await;
+        let target_coords: Vec3 = Vec3::new(
             params.get("x").context("failed to find x")?.parse()?,
             params.get("y").context("failed to find y")?.parse()?,
             params.get("z").context("failed to find z")?.parse()?,
         );
         let horizontal_direction =
-            Vector3::new(target_coords.x - pos.x, 0.0, target_coords.z - pos.z).normalize();
+            Vec3::new(target_coords.x - pos.x, 0.0, target_coords.z - pos.z).normalize();
         let top_attack_coords = TOP_ATTACK_TOWARDS_TARGET * horizontal_direction
-            + Vector3::new(pos.x, target_coords.y + TOP_ATTACK_HEIGHT, pos.z);
+            + Vec3::new(pos.x, target_coords.y + TOP_ATTACK_HEIGHT, pos.z);
 
         let top_attack = params
             .get("top")
@@ -98,123 +98,45 @@ impl TargetCoordGuidance {
         };
         self.get_guidance(missile_state).await
     }
+
     async fn rising_up(&mut self, missile_state: MissileState) -> ControlInput {
         if missile_state.pos_y >= self.top_attack_coord.y {
             self.state = State::FlyingTowardsTarget;
             return self.get_guidance(missile_state).await;
         }
-        self.flying_towards_coord(missile_state, self.top_attack_coord)
-            .await
-    }
 
-    async fn flying_towards_target(&mut self, missile_state: MissileState) -> ControlInput {
-        // There is not next state; we simply detonate at some point.
-        self.flying_towards_coord(missile_state, self.target_coord)
-            .await
-    }
-
-    async fn flying_towards_coord(
-        &mut self,
-        missile_state: MissileState,
-        cur_target: na::Vector3<f64>,
-    ) -> ControlInput {
-        let to_cur_target = cur_target - Self::get_missile_pos(&missile_state);
-        // This is not entirely correct as we loose a bit of our thrust due to gravity.
-        let acc_to_cur_target = Self::calculate_acc_for_target_vel(
-            Self::get_missile_vel(&missile_state),
-            to_cur_target,
+        let (pitch_turn, yaw_turn) = calc_pitch_yaw_turn_for_stationary_target(
+            &missile_state,
+            self.top_attack_coord,
             THRUST,
-        );
-        let (target_pitch, target_yaw) = Self::calc_pitch_yaw(acc_to_cur_target);
-        let pitch_turn =
-            lookup_gravity_heading(GRAVITY, target_pitch, THRUST) - missile_state.pitch;
-        let yaw_turn = target_yaw - missile_state.yaw;
-
+        )
+        .await;
         ControlInput {
             // set later
             id: 0,
             hardware_config: self.hardware_config.take(),
             pitch_turn,
             yaw_turn,
-            explode: self.should_detonate(&missile_state).await,
+            explode: sphere_should_detonate(&missile_state, self.target_coord, PROXIMITY_FUSE_DIST)
+                .await,
             disarm: false,
         }
     }
 
-    fn get_missile_pos(missile_state: &MissileState) -> na::Vector3<f64> {
-        Vector3::new(
-            missile_state.pos_x,
-            missile_state.pos_y,
-            missile_state.pos_z,
-        )
-    }
-
-    fn get_missile_vel(missile_state: &MissileState) -> na::Vector3<f64> {
-        Vector3::new(
-            missile_state.vel_x,
-            missile_state.vel_y,
-            missile_state.vel_z,
-        )
-    }
-
-    // The length of target_vel doesn't matter.
-    // The length of the returned acc is not guaranteed to be anything.
-    fn calculate_acc_for_target_vel(
-        cur_vel: na::Vector3<f64>,
-        target_vel: na::Vector3<f64>,
-        thrust: f64,
-    ) -> na::Vector3<f64> {
-        // When the missile doesn't move, just head for the target.
-        if relative_eq!(cur_vel.norm_squared(), 0.0) {
-            return target_vel;
+    async fn flying_towards_target(&mut self, missile_state: MissileState) -> ControlInput {
+        // There is no next state; we simply detonate at some point.
+        let (pitch_turn, yaw_turn) =
+            calc_pitch_yaw_turn_for_stationary_target(&missile_state, self.target_coord, THRUST)
+                .await;
+        ControlInput {
+            // set later
+            id: 0,
+            hardware_config: self.hardware_config.take(),
+            pitch_turn,
+            yaw_turn,
+            explode: sphere_should_detonate(&missile_state, self.target_coord, PROXIMITY_FUSE_DIST)
+                .await,
+            disarm: false,
         }
-
-        println!("{}", cur_vel);
-        println!("{}", target_vel);
-        println!("{}", thrust);
-        let radical = 4.0 * target_vel.dot(&cur_vel).powf(2.0)
-            - 4.0 * target_vel.norm_squared() * (cur_vel.norm_squared() - thrust.powf(2.0));
-        println!("{}", radical);
-
-        if radical <= 0.0 {
-            let p = cur_vel.dot(&target_vel) / target_vel.norm_squared() * target_vel;
-            let acc = p - cur_vel;
-            println!("proj {}", acc);
-            return acc;
-        } else {
-            let r1 = (2.0 * target_vel.dot(&cur_vel) + radical.sqrt())
-                / (2.0 * target_vel.norm_squared());
-            // fun fact: this would be good opportunity for breaking
-            // let r2 = (2.0 * target_vel.dot(&cur_vel) - radical.sqrt())
-            //     / (2.0 * target_vel.norm_squared());
-            let r = r1;
-            let acc = r * target_vel - cur_vel;
-            assert_relative_eq!(acc.norm(), thrust, epsilon = 0.0001);
-            println!("sphere {}", acc);
-            return acc;
-        }
-    }
-
-    // Calculate the pitch and yaw of a vector as if it were the direction a player is looking in
-    // degrees.
-    fn calc_pitch_yaw(vec: na::Vector3<f64>) -> (f64, f64) {
-        // projected onto the horizontal plane
-        let vec_horizontal = na::Vector3::new(vec.x, 0.0, vec.z);
-        let mut pitch = vec_horizontal
-            .normalize()
-            .dot(&vec.normalize())
-            .acos()
-            .to_degrees();
-        if vec.y < 0.0 {
-            pitch *= -1.0;
-        }
-        let yaw = vec.x.atan2(vec.z).to_degrees();
-        (pitch, yaw)
-    }
-
-    async fn should_detonate(&mut self, missile_state: &MissileState) -> bool {
-        // check if we're close enough to the target
-        (self.target_coord - Self::get_missile_pos(missile_state)).norm_squared()
-            <= PROXIMITY_FUSE_DIST * PROXIMITY_FUSE_DIST
     }
 }

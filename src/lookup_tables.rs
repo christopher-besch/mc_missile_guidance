@@ -50,7 +50,7 @@ fn lerp(left: f64, right: f64, t: f64) -> f64 {
 
 // return approximate heading to aim the missile to reach the requested target_pitch
 pub fn lookup_gravity_heading(gravity: f64, target_pitch: f64, thrust: f64) -> f64 {
-    let effective_thrust = thrust / gravity;
+    let effective_thrust = gravity_heading_data::GRAVITY * thrust / gravity;
     let (left_thrust_idx, right_thrust_idx, thrust_lerp_t) =
         get_lerp_params(&gravity_heading_data::THRUSTS, effective_thrust);
     let (left_target_pitch_idx, right_target_pitch_idx, target_pitch_lerp_t) =

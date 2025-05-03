@@ -1,3 +1,4 @@
+pub mod helper;
 pub mod program_coord_guidance;
 pub mod straight_guidance;
 pub mod straight_guidance_wo_gravity;
