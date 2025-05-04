@@ -39,19 +39,19 @@ pub async fn get_seeker_target_pos(missile_state: &MissileState) -> Result<Optio
     }
 }
 
-pub async fn get_seeker_target_vel(missile_state: &MissileState) -> Result<Option<Vec3>> {
-    if !missile_state.target_lock {
-        bail!("no target lock");
-    } else if !missile_state.target_visible {
-        Ok(None)
-    } else {
-        Ok(Some(Vec3::new(
-            missile_state.target_vel_x,
-            missile_state.target_vel_y,
-            missile_state.target_vel_z,
-        )))
-    }
-}
+// pub async fn get_seeker_target_vel(missile_state: &MissileState) -> Result<Option<Vec3>> {
+//     if !missile_state.target_lock {
+//         bail!("no target lock");
+//     } else if !missile_state.target_visible {
+//         Ok(None)
+//     } else {
+//         Ok(Some(Vec3::new(
+//             missile_state.target_vel_x,
+//             missile_state.target_vel_y,
+//             missile_state.target_vel_z,
+//         )))
+//     }
+// }
 
 // The length of target_vel doesn't matter.
 // The length of the returned acc is not guaranteed to be anything.
@@ -67,8 +67,7 @@ pub async fn calculate_acc_for_target_vel(cur_vel: Vec3, target_vel: Vec3, thrus
 
     if radical <= 0.0 {
         let p = cur_vel.dot(&target_vel) / target_vel.norm_squared() * target_vel;
-        let acc = p - cur_vel;
-        acc
+        p - cur_vel
     } else {
         let r1 =
             (2.0 * target_vel.dot(&cur_vel) + radical.sqrt()) / (2.0 * target_vel.norm_squared());
