@@ -81,8 +81,8 @@ pub async fn calculate_acc_for_target_vel(cur_vel: Vec3, target_vel: Vec3, thrus
     }
 }
 
-// Calculate the pitch and yaw of a vector as if it were the direction a player is looking in
-// degrees.
+// Calculate the pitch and yaw of a vector as if it were the direction a missile is headed
+// in degrees.
 pub async fn calc_pitch_yaw(vec: Vec3) -> (f64, f64) {
     // projected onto the horizontal plane
     let vec_horizontal = Vec3::new(vec.x, 0.0, vec.z);
